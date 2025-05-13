@@ -1,0 +1,40 @@
+mqtt:
+  broker: localhost
+  port: 1883
+  username: ""
+  password: ""
+  topics:
+    doorbell: home/doorbell/ring
+    motion: home/motion/detected
+    message: home/display/message
+
+audio:
+  directory: /path/to/audio/files
+  default_sound: doorbell.wav
+  mixer:
+    device: Digital
+    control: PCM
+
+video:
+  default_stream: http://your-camera-stream-url
+
+displays:
+  hdmi:
+    framebuffer: /dev/fb0  # Framebuffer device for direct output
+  oled:
+    i2c_port: 1
+    i2c_address: 0x3c
+
+gpio:
+  volume_encoder:
+    clk: 17
+    dt: 18
+    sw: 27
+  sound_select_encoder:
+    clk: 22
+    dt: 23
+    sw: 24
+
+shairport:
+  metadata_pipe: /tmp/shairport-sync-metadata
+  show_duration: 10  # How long to show the track info before returning to normal display
