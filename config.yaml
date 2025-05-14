@@ -1,40 +1,108 @@
+# Smart Doorbell System Configuration
+
+# MQTT Connection Settings
 mqtt:
+  # MQTT broker hostname or IP address
+  # Default: localhost
   broker: localhost
+
+  # MQTT broker port number
+  # Default: 1883
+  # Common alternatives: 8883 (TLS)
   port: 1883
+
+  # MQTT authentication credentials
+  # Leave empty for no authentication
+  # Default: empty (no authentication)
   username: ""
   password: ""
+
+  # MQTT topics for system events
   topics:
+    # Topic for doorbell ring events
+    # Payload format: {"active": bool, "timestamp": "ISO8601", "video_url": "string"}
     doorbell: home/doorbell/ring
+
+    # Topic for motion detection events
+    # Payload format: {"active": bool, "timestamp": "ISO8601", "video_url": "string"}
     motion: home/motion/detected
+
+    # Topic for displaying custom messages on OLED
+    # Payload format: {"text": "string"} or plain string
     message: home/display/message
 
+# Audio System Configuration
 audio:
+  # Directory containing WAV sound files for doorbell
+  # Must be absolute path with read permissions
   directory: /path/to/audio/files
+
+  # Default sound file to play on doorbell events
+  # Must be a .wav file present in the audio directory
   default_sound: doorbell.wav
+
+  # ALSA mixer configuration
   mixer:
+    # ALSA mixer device name
+    # Default: Digital
+    # Use 'aplay -l' to list available devices
     device: Digital
+
+    # ALSA mixer control name
+    # Default: PCM
+    # Common alternatives: Master, Speaker, Headphone
     control: PCM
 
+# Video Stream Configuration
 video:
+  # Default video stream URL for doorbell camera
+  # Supports rtsp://, http://, or local device paths
   default_stream: http://your-camera-stream-url
 
+# Display Device Configuration
 displays:
+  # HDMI display settings
   hdmi:
+    # Linux framebuffer device for video output
+    # Default: /dev/fb0
+    # Requires read/write permissions
     framebuffer: /dev/fb0  # Framebuffer device for direct output
+
+  # OLED display settings (SSD1305)
   oled:
+    # I2C port number
+    # Default: 1 (Raspberry Pi /dev/i2c-1)
     i2c_port: 1
+
+    # OLED display I2C address (hexadecimal)
+    # Default: 0x3c
+    # Use 'i2cdetect -y 1' to verify address
     i2c_address: 0x3c
 
+# GPIO Pin Configuration
 gpio:
+  # Volume control rotary encoder
   volume_encoder:
-    clk: 17
-    dt: 18
-    sw: 27
-  sound_select_encoder:
-    clk: 22
-    dt: 23
-    sw: 24
+    # GPIO pin numbers in BCM mode
+    clk: 17  # Clock signal pin
+    dt: 18   # Data signal pin
+    sw: 27   # Switch/button pin
 
+  # Sound selection rotary encoder
+  sound_select_encoder:
+    # GPIO pin numbers in BCM mode
+    clk: 22  # Clock signal pin
+    dt: 23   # Data signal pin
+    sw: 24   # Switch/button pin
+
+# Shairport Sync AirPlay Configuration
 shairport:
+  # Path to Shairport Sync metadata pipe
+  # Default: /tmp/shairport-sync-metadata
+  # Must match Shairport Sync configuration
   metadata_pipe: /tmp/shairport-sync-metadata
+
+  # Duration in seconds to show track information
+  # Default: 10
+  # Set to 0 to disable automatic hiding
   show_duration: 10  # How long to show the track info before returning to normal display

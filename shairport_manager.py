@@ -1,5 +1,6 @@
 import threading
 import time
+import logging
 from shairport_sync_metadata.metadata_reader import MetadataReader
 from shairport_sync_metadata.metadata import Item
 
@@ -11,6 +12,7 @@ class ShairportManager:
             pipe_path (str): Path to the Shairport Sync metadata pipe
             oled_manager (OLEDManager, optional): OLED display for showing track info
             show_duration (int): How long to show track info in seconds"""
+        self.logger = logging.getLogger(__name__)
         self.pipe_path = pipe_path
         self.oled_manager = oled_manager
         self.show_duration = show_duration
@@ -19,6 +21,7 @@ class ShairportManager:
         self.running = False
         self.current_track = None
         self.display_thread = None
+        self.logger.info(f"Initialized Shairport metadata manager with pipe: {pipe_path}")
         
     def start(self):
         """Start monitoring Shairport Sync metadata in a background thread."""
@@ -26,6 +29,7 @@ class ShairportManager:
         self.reader_thread = threading.Thread(target=self._read_metadata)
         self.reader_thread.daemon = True
         self.reader_thread.start()
+        self.logger.info("Started Shairport metadata monitoring")
         
     def stop(self):
         """Stop monitoring metadata and clean up resources."""
@@ -36,6 +40,7 @@ class ShairportManager:
             self.reader_thread.join()
         if self.display_thread and self.display_thread.is_alive():
             self.display_thread.cancel()
+        self.logger.info("Stopped Shairport metadata monitoring")
             
     def _handle_metadata(self, item: Item):
         """Process metadata items from Shairport.
@@ -46,7 +51,7 @@ class ShairportManager:
             return
             
         if item.type == 'ssnc' and item.code == 'pend':
-            # Playback ended
+            self.logger.debug("AirPlay playback ended")
             self.current_track = None
             if self.display_thread and self.display_thread.is_alive():
                 self.display_thread.cancel()
@@ -54,38 +59,33 @@ class ShairportManager:
             if item.code == 'asal':  # Album name
                 self.current_track = self.current_track or {}
                 self.current_track['album'] = item.text
+                self.logger.debug(f"Received album metadata: {item.text}")
             elif item.code == 'asar':  # Artist name
                 self.current_track = self.current_track or {}
                 self.current_track['artist'] = item.text
+                self.logger.debug(f"Received artist metadata: {item.text}")
             elif item.code == 'minm':  # Track title
                 self.current_track = self.current_track or {}
                 self.current_track['title'] = item.text
+                self.logger.debug(f"Received title metadata: {item.text}")
                 self._update_display()
                 
     def _update_display(self):
-        """Update the OLED display with current track information.
-        Shows artist and title for show_duration seconds."""
+        """Update the OLED display with current track information."""
         if not self.oled_manager or not self.current_track:
             return
             
-        def restore_display():
-            # Only restore if we're not showing a different track
-            if self.oled_manager.message.startswith("♫"):
-                self.oled_manager.restore_previous_message()
-                
         # Format track info
-        track_info = "♫ "
+        line1 = "♫ "
         if 'title' in self.current_track:
-            track_info += self.current_track['title']
+            line1 += self.current_track['title']
+            
+        line2 = ""
         if 'artist' in self.current_track:
-            track_info += f" - {self.current_track['artist']}"
+            line2 = self.current_track['artist']
             
-        # Cancel any existing display timer
-        if self.display_thread and self.display_thread.is_alive():
-            self.display_thread.cancel()
-            
-        # Show track info
-        self.oled_manager.show_temporary_message(track_info, self.show_duration)
+        self.logger.info(f"Now playing: {line1.strip()} - {line2}")
+        self.oled_manager.show_centered_text(line1, line2, duration=self.show_duration)
         
     def _read_metadata(self):
         """Background thread function that reads metadata from Shairport pipe.
@@ -93,10 +93,14 @@ class ShairportManager:
         while self.running:
             try:
                 self.reader = MetadataReader(self.pipe_path)
+                self.logger.debug("Connected to Shairport metadata pipe")
                 for item in self.reader.items():
                     if not self.running:
                         break
                     self._handle_metadata(item)
+            except FileNotFoundError:
+                self.logger.warning(f"Metadata pipe not found: {self.pipe_path}")
+                time.sleep(5)
             except Exception as e:
-                print(f"Error reading Shairport metadata: {e}")
+                self.logger.error(f"Error reading Shairport metadata: {e}")
                 time.sleep(5)  # Wait before retrying

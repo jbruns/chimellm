@@ -54,8 +54,14 @@ sudo apt-get install -y \
     libasound2-dev \
     libsdl2-dev \
     vlc \
-    shairport-sync
+    shairport-sync \
+    fonts-font-awesome  # Added for icon support
 ```
+
+# Create Font Awesome symlink for the OLED display
+sudo mkdir -p /usr/share/fonts/fontawesome
+sudo ln -s /usr/share/fonts/truetype/font-awesome/fa-solid-900.ttf /usr/share/fonts/fontawesome/fa-solid-900.ttf
+sudo fc-cache -f -v
 
 ### Enable I2C Interface
 1. Run `sudo raspi-config`
