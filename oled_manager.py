@@ -13,6 +13,7 @@ class OLEDManager:
         self.device = ssd1305(serial, width=128, height=32)
         self.device.contrast(255)
         self.last_motion_time = None
+        self.motion_active = False
         self.message = ""
         self.scroll_position = 0
         self.scroll_start_time = None
@@ -22,6 +23,7 @@ class OLEDManager:
         self.prev_message = ""
         self.temp_message = None
         self.temp_message_thread = None
+        self.pre_event_message = None
         
         # Load fonts - try to find an emoji-capable font, fallback to regular font
         try:
@@ -32,14 +34,22 @@ class OLEDManager:
             except OSError:
                 self.font = ImageFont.load_default()
         
-    def update_motion_time(self):
-        self.last_motion_time = datetime.now()
+    def update_motion_time(self, timestamp=None, active=False):
+        """Update the last motion time and active state"""
+        self.last_motion_time = timestamp or datetime.now()
+        self.motion_active = active
         
     def set_message(self, message):
         self.message = message
         self.scroll_position = 0
         self.scroll_start_time = None
         self.scroll_paused = True
+        
+    def set_event_message(self, message):
+        """Set a temporary message for an active event, storing the previous message"""
+        if self.pre_event_message is None:
+            self.pre_event_message = self.message
+        self.message = message
         
     def show_temporary_message(self, message, duration):
         """Show a temporary message and revert to previous state after duration"""
@@ -70,12 +80,17 @@ class OLEDManager:
         self.temp_message_thread.start()
         
     def restore_previous_message(self):
-        """Manually restore the previous message"""
-        if self.temp_message:
+        """Restore the message from before an event"""
+        if self.pre_event_message is not None:
+            self.message = self.pre_event_message
+            self.pre_event_message = None
+        elif self.temp_message:
             self.temp_message = None
             self.message = self.prev_message
         
     def _get_motion_time_text(self):
+        if self.motion_active:
+            return "now"
         if self.last_motion_time is None:
             return "??"
         delta = datetime.now() - self.last_motion_time

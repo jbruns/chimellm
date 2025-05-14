@@ -2,7 +2,9 @@ import os
 import json
 import time
 import yaml
+import logging
 from pathlib import Path
+from datetime import datetime
 import paho.mqtt.client as mqtt
 
 from audio_manager import AudioManager
@@ -13,6 +15,13 @@ from shairport_manager import ShairportManager
 
 class DoorbellSystem:
     def __init__(self):
+        # Setup logging
+        logging.basicConfig(
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            level=logging.INFO
+        )
+        self.logger = logging.getLogger(__name__)
+        
         with open('config.yaml', 'r') as f:
             self.config = yaml.safe_load(f)
         
@@ -115,35 +124,65 @@ class DoorbellSystem:
         ]
         client.subscribe(topics)
         
+    def handle_event_message(self, topic, payload):
+        """Handle doorbell or motion event messages"""
+        try:
+            if not isinstance(payload, dict):
+                raise ValueError("Payload must be a JSON object")
+                
+            # Check for required fields
+            if not all(key in payload for key in ['active', 'timestamp', 'video_url']):
+                raise ValueError("Missing required fields in payload")
+                
+            # Convert timestamp string to datetime
+            try:
+                event_time = datetime.fromisoformat(payload['timestamp'])
+            except (ValueError, TypeError):
+                raise ValueError("Invalid timestamp format")
+                
+            # Handle based on event type
+            if topic == self.config['mqtt']['topics']['motion']:
+                # Update motion time with active state
+                self.oled.update_motion_time(event_time, payload['active'])
+                # Handle message display
+                if payload['active']:
+                    self.oled.set_event_message("Motion detected on doorbell camera!")
+                else:
+                    self.oled.restore_previous_message()
+            else:  # Doorbell event
+                if payload['active']:
+                    self.oled.set_event_message("Someone's at the door!")
+                else:
+                    self.oled.restore_previous_message()
+            
+            # Handle active state display and actions
+            if payload['active']:
+                self.hdmi.turn_on_display()
+                # For doorbell events, also play the sound
+                if topic == self.config['mqtt']['topics']['doorbell']:
+                    self.audio.play_sound(self.config['audio']['default_sound'])
+                # Use provided video URL or fall back to default
+                video_url = payload['video_url'] or self.config['video']['default_stream']
+                self.hdmi.play_video(video_url)
+                
+        except (ValueError, TypeError) as e:
+            self.logger.error(f"Error processing {topic} message: {str(e)}")
+            self.logger.debug(f"Problematic payload: {payload}")
+            
     def on_message(self, client, userdata, msg):
         topic = msg.topic
         try:
             payload = json.loads(msg.payload.decode())
+            
+            if topic in [self.config['mqtt']['topics']['doorbell'], 
+                        self.config['mqtt']['topics']['motion']]:
+                self.handle_event_message(topic, payload)
+            elif topic == self.config['mqtt']['topics']['message']:
+                self.handle_message(payload)
+                
         except json.JSONDecodeError:
-            payload = msg.payload.decode()
-            
-        if topic == self.config['mqtt']['topics']['doorbell']:
-            self.handle_doorbell(payload)
-        elif topic == self.config['mqtt']['topics']['motion']:
-            self.handle_motion(payload)
-        elif topic == self.config['mqtt']['topics']['message']:
-            self.handle_message(payload)
-            
-    def handle_doorbell(self, payload):
-        self.hdmi.turn_on_display()
-        self.audio.play_sound(self.config['audio']['default_sound'])
-        if isinstance(payload, dict) and 'video_url' in payload:
-            self.hdmi.play_video(payload['video_url'])
-        else:
-            self.hdmi.play_video(self.config['video']['default_stream'])
-            
-    def handle_motion(self, payload):
-        self.oled.update_motion_time()
-        self.hdmi.turn_on_display()
-        if isinstance(payload, dict) and 'video_url' in payload:
-            self.hdmi.play_video(payload['video_url'])
-        else:
-            self.hdmi.play_video(self.config['video']['default_stream'])
+            self.logger.error(f"Invalid JSON received on topic {topic}")
+            self.logger.debug(f"Raw payload: {msg.payload}")
             
     def handle_message(self, payload):
         if isinstance(payload, dict) and 'text' in payload:
