@@ -9,6 +9,11 @@ import threading
 
 class OLEDManager:
     def __init__(self, i2c_port, i2c_address):
+        """Initialize OLED display manager.
+        
+        Args:
+            i2c_port (int): I2C port number for display
+            i2c_address (int): I2C address of the display"""
         serial = i2c(port=i2c_port, address=i2c_address)
         self.device = ssd1305(serial, width=128, height=32)
         self.device.contrast(255)
@@ -35,24 +40,39 @@ class OLEDManager:
                 self.font = ImageFont.load_default()
         
     def update_motion_time(self, timestamp=None, active=False):
-        """Update the last motion time and active state"""
+        """Update the last motion detection time and active state.
+        
+        Args:
+            timestamp (datetime, optional): Time of motion detection. Uses current time if None.
+            active (bool): Whether motion is currently active"""
         self.last_motion_time = timestamp or datetime.now()
         self.motion_active = active
         
     def set_message(self, message):
+        """Set the primary message to display on the OLED.
+        
+        Args:
+            message (str): Message to display"""
         self.message = message
         self.scroll_position = 0
         self.scroll_start_time = None
         self.scroll_paused = True
         
     def set_event_message(self, message):
-        """Set a temporary message for an active event, storing the previous message"""
+        """Display a temporary message for an event, saving the previous message.
+        
+        Args:
+            message (str): Event message to display"""
         if self.pre_event_message is None:
             self.pre_event_message = self.message
         self.message = message
         
     def show_temporary_message(self, message, duration):
-        """Show a temporary message and revert to previous state after duration"""
+        """Show a message temporarily and revert to previous message after duration.
+        
+        Args:
+            message (str): Message to display temporarily
+            duration (int): Duration in seconds to show message"""
         def restore_message():
             if self.temp_message == message:  # Only restore if no new temp message
                 self.temp_message = None
@@ -80,7 +100,7 @@ class OLEDManager:
         self.temp_message_thread.start()
         
     def restore_previous_message(self):
-        """Restore the message from before an event"""
+        """Restore the message that was displayed before an event or temporary message."""
         if self.pre_event_message is not None:
             self.message = self.pre_event_message
             self.pre_event_message = None
@@ -89,6 +109,10 @@ class OLEDManager:
             self.message = self.prev_message
         
     def _get_motion_time_text(self):
+        """Format the time since last motion for display.
+        
+        Returns:
+            str: Formatted time string (e.g., "5m" for 5 minutes, "2h 30m" for 2.5 hours)"""
         if self.motion_active:
             return "now"
         if self.last_motion_time is None:
@@ -101,15 +125,33 @@ class OLEDManager:
         return f"{hours}h {minutes%60}m"
         
     def _draw_separator_line(self, draw, y_pos):
-        """Draw a single pixel horizontal line"""
+        """Draw a horizontal separator line on the display.
+        
+        Args:
+            draw: PIL ImageDraw object
+            y_pos (int): Vertical position to draw line"""
         draw.line([(0, y_pos), (self.device.width-1, y_pos)], fill="white", width=1)
         
     def _draw_vertical_separator(self, draw, x_pos, y_start, y_end):
-        """Draw a single pixel vertical line"""
+        """Draw a vertical separator line on the display.
+        
+        Args:
+            draw: PIL ImageDraw object
+            x_pos (int): Horizontal position to draw line
+            y_start (int): Starting vertical position
+            y_end (int): Ending vertical position"""
         draw.line([(x_pos, y_start), (x_pos, y_end)], fill="white", width=1)
         
     def _truncate_filename(self, filename, max_width, draw):
-        """Truncate filename if it's too wide for display"""
+        """Truncate a filename to fit within a given width.
+        
+        Args:
+            filename (str): Filename to truncate
+            max_width (int): Maximum width in pixels
+            draw: PIL ImageDraw object
+            
+        Returns:
+            str: Truncated filename with ellipsis if needed"""
         if draw.textlength(filename, font=self.font) <= max_width:
             return filename
         
@@ -118,7 +160,17 @@ class OLEDManager:
         return filename
         
     def _center_text(self, text, draw, area_width, area_height, y_offset=0):
-        """Calculate position to center text in given area"""
+        """Calculate position to center text in a given area.
+        
+        Args:
+            text (str): Text to center
+            draw: PIL ImageDraw object
+            area_width (int): Width of area to center in
+            area_height (int): Height of area to center in
+            y_offset (int): Additional vertical offset
+            
+        Returns:
+            tuple: (x, y) coordinates for centered text"""
         text_width = draw.textlength(text, font=self.font)
         text_height = self.font.getsize(text)[1]  # Get text height
         x = (area_width - text_width) // 2
@@ -126,7 +178,10 @@ class OLEDManager:
         return x, y
         
     def show_sound_selection(self, filename):
-        """Show sound selection screen temporarily"""
+        """Show sound selection screen temporarily.
+        
+        Args:
+            filename (str): Name of sound file being selected"""
         def restore_display():
             if self.temporary_display:
                 self.temporary_display = False
@@ -148,6 +203,8 @@ class OLEDManager:
         self.temp_display_thread.start()
         
     def update_display(self):
+        """Update the OLED display with current information.
+        Draws time, motion info, and scrolling message or sound selection."""
         with canvas(self.device) as draw:
             if self.temporary_display:
                 # Display sound selection screen
@@ -222,7 +279,7 @@ class OLEDManager:
                         draw.text((x_pos, 16), self.message, font=self.font, fill="white")
                         
     def cleanup(self):
-        """Cleanup any running threads"""
+        """Clean up display resources and cancel any active temporary message threads."""
         if self.temp_message_thread and self.temp_message_thread.is_alive():
             self.temp_message_thread.cancel()
         if self.temp_display_thread and self.temp_display_thread.is_alive():

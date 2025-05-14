@@ -5,6 +5,12 @@ from shairport_sync_metadata.metadata import Item
 
 class ShairportManager:
     def __init__(self, pipe_path, oled_manager=None, show_duration=10):
+        """Initialize Shairport Sync metadata manager.
+        
+        Args:
+            pipe_path (str): Path to the Shairport Sync metadata pipe
+            oled_manager (OLEDManager, optional): OLED display for showing track info
+            show_duration (int): How long to show track info in seconds"""
         self.pipe_path = pipe_path
         self.oled_manager = oled_manager
         self.show_duration = show_duration
@@ -15,14 +21,14 @@ class ShairportManager:
         self.display_thread = None
         
     def start(self):
-        """Start monitoring Shairport Sync metadata"""
+        """Start monitoring Shairport Sync metadata in a background thread."""
         self.running = True
         self.reader_thread = threading.Thread(target=self._read_metadata)
         self.reader_thread.daemon = True
         self.reader_thread.start()
         
     def stop(self):
-        """Stop monitoring Shairport Sync metadata"""
+        """Stop monitoring metadata and clean up resources."""
         self.running = False
         if self.reader:
             self.reader.stop()
@@ -32,7 +38,10 @@ class ShairportManager:
             self.display_thread.cancel()
             
     def _handle_metadata(self, item: Item):
-        """Process metadata items from Shairport"""
+        """Process metadata items from Shairport.
+        
+        Args:
+            item (Item): Metadata item containing type, code, and text"""
         if not item or not item.type:
             return
             
@@ -54,7 +63,8 @@ class ShairportManager:
                 self._update_display()
                 
     def _update_display(self):
-        """Update the OLED display with current track info"""
+        """Update the OLED display with current track information.
+        Shows artist and title for show_duration seconds."""
         if not self.oled_manager or not self.current_track:
             return
             
@@ -78,7 +88,8 @@ class ShairportManager:
         self.oled_manager.show_temporary_message(track_info, self.show_duration)
         
     def _read_metadata(self):
-        """Read metadata from Shairport Sync pipe"""
+        """Background thread function that reads metadata from Shairport pipe.
+        Continuously reads and processes metadata while running is True."""
         while self.running:
             try:
                 self.reader = MetadataReader(self.pipe_path)

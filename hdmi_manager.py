@@ -5,12 +5,18 @@ from vcgencmd import Vcgencmd
 
 class HDMIManager:
     def __init__(self, framebuffer):
+        """Initialize HDMI display manager.
+        
+        Args:
+            framebuffer (str): Path to the framebuffer device for video output"""
         self.framebuffer = framebuffer
         self.player = None
         self.is_display_on = False
         self.vcgencmd = Vcgencmd()
         
     def turn_on_display(self):
+        """Enable the HDMI display using vcgencmd.
+        Waits 1 second for display initialization."""
         if not self.is_display_on:
             try:
                 self.vcgencmd.display_power(1)
@@ -20,6 +26,8 @@ class HDMIManager:
                 print(f"Warning: Could not enable display: {e}")
             
     def turn_off_display(self):
+        """Disable the HDMI display.
+        Stops any playing video before turning off the display."""
         if self.is_display_on:
             if self.player:
                 self.stop_video()
@@ -30,6 +38,10 @@ class HDMIManager:
             self.is_display_on = False
             
     def play_video(self, url):
+        """Play a video stream on the HDMI display using VLC.
+        
+        Args:
+            url (str): URL or path of the video stream to play"""
         self.turn_on_display()
         if self.player:
             self.player.stop()
@@ -46,6 +58,7 @@ class HDMIManager:
         self.player.play()
         
     def stop_video(self):
+        """Stop the currently playing video if any."""
         if self.player:
             self.player.stop()
             self.player = None

@@ -6,6 +6,13 @@ from pathlib import Path
 
 class AudioManager:
     def __init__(self, audio_dir, mixer_device='Digital', mixer_control='PCM', oled_manager=None):
+        """Initialize the audio manager with ALSA mixer and sound directory.
+        
+        Args:
+            audio_dir (str): Directory containing WAV sound files
+            mixer_device (str): ALSA mixer device name
+            mixer_control (str): ALSA mixer control name
+            oled_manager (OLEDManager, optional): OLED display manager for showing volume"""
         self.audio_dir = Path(audio_dir)
         self.oled_manager = oled_manager
         self.volume_display_thread = None
@@ -24,6 +31,10 @@ class AudioManager:
         self._set_volume(self.current_volume)
         
     def play_sound(self, filename):
+        """Play a WAV file using aplay.
+        
+        Args:
+            filename (str): Name of the WAV file in the audio directory"""
         if self.is_muted:
             return
         
@@ -33,6 +44,10 @@ class AudioManager:
             os.system(f"aplay {str(file_path)}")
             
     def _display_volume_temporarily(self, message):
+        """Show volume information on the OLED display for 5 seconds.
+        
+        Args:
+            message (str): Volume message to display"""
         if not self.oled_manager:
             return
             
@@ -56,6 +71,10 @@ class AudioManager:
         self.volume_display_thread.start()
             
     def adjust_volume(self, delta):
+        """Adjust the system volume by a relative amount.
+        
+        Args:
+            delta (float): Volume adjustment between -1.0 and 1.0"""
         if self.is_muted:
             return
             
@@ -65,6 +84,7 @@ class AudioManager:
         self._display_volume_temporarily(f"Volume: {self.current_volume}%")
         
     def toggle_mute(self):
+        """Toggle the audio mute state and display the new state on the OLED."""
         self.is_muted = not self.is_muted
         if self.is_muted:
             self.mixer.setmute(1)
@@ -74,12 +94,21 @@ class AudioManager:
             self._display_volume_temporarily(f"Volume: {self.current_volume}%")
         
     def _set_volume(self, volume):
+        """Set the system volume to a specific level.
+        
+        Args:
+            volume (int): Volume level between 0 and 100"""
         self.current_volume = volume
         self.mixer.setvolume(volume)
         
     def get_available_sounds(self):
+        """Get a list of WAV files in the audio directory.
+        
+        Returns:
+            list[str]: List of WAV filenames"""
         return [f.name for f in self.audio_dir.glob("*.wav")]
         
     def cleanup(self):
+        """Clean up resources by canceling any active volume display thread."""
         if self.volume_display_thread and self.volume_display_thread.is_alive():
             self.volume_display_thread.cancel()

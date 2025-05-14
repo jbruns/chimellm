@@ -15,6 +15,9 @@ from shairport_manager import ShairportManager
 
 class DoorbellSystem:
     def __init__(self):
+        """Initialize the doorbell system with all required components.
+        Sets up logging, loads config, and initializes OLED, audio, HDMI, Shairport,
+        encoder managers and MQTT client."""
         # Setup logging
         logging.basicConfig(
             format='%(asctime)s - %(levelname)s - %(message)s',
@@ -76,7 +79,8 @@ class DoorbellSystem:
         self.setup_encoder_callbacks()
         
     def toggle_display(self):
-        """New method to handle display toggle"""
+        """Toggle the HDMI display on/off.
+        When turning on, automatically starts playing the default video stream."""
         if self.hdmi.is_display_on:
             self.hdmi.turn_off_display()
         else:
@@ -84,6 +88,9 @@ class DoorbellSystem:
             self.hdmi.play_video(self.config['video']['default_stream'])
             
     def setup_encoder_callbacks(self):
+        """Configure the rotary encoder callbacks for volume control and sound selection.
+        Volume encoder: Controls system volume and mute
+        Sound selection encoder: Controls sound selection and display toggle"""
         # Volume encoder
         self.encoders.setup_volume_callbacks(
             volume_up=lambda: self.audio.adjust_volume(0.05),
@@ -99,16 +106,22 @@ class DoorbellSystem:
         )
         
     def next_sound(self):
+        """Select the next available doorbell sound in the list.
+        Updates the OLED display to show the newly selected sound."""
         if self.available_sounds:
             self.selected_sound_index = (self.selected_sound_index + 1) % len(self.available_sounds)
             self.oled.show_sound_selection(self.available_sounds[self.selected_sound_index])
             
     def prev_sound(self):
+        """Select the previous available doorbell sound in the list.
+        Updates the OLED display to show the newly selected sound."""
         if self.available_sounds:
             self.selected_sound_index = (self.selected_sound_index - 1) % len(self.available_sounds)
             self.oled.show_sound_selection(self.available_sounds[self.selected_sound_index])
             
     def play_selected_sound(self):
+        """Play the currently selected doorbell sound.
+        Also turns on the HDMI display and starts the default video stream."""
         if self.available_sounds:
             # Update the active sound index when explicitly selected
             self.current_sound_index = self.selected_sound_index
@@ -117,6 +130,13 @@ class DoorbellSystem:
             self.hdmi.play_video(self.config['video']['default_stream'])
             
     def on_connect(self, client, userdata, flags, rc):
+        """MQTT connection callback. Subscribes to doorbell, motion, and message topics.
+        
+        Args:
+            client: MQTT client instance
+            userdata: Private user data
+            flags: Connection flags
+            rc: Connection result code"""
         topics = [
             (self.config['mqtt']['topics']['doorbell'], 0),
             (self.config['mqtt']['topics']['motion'], 0),
@@ -125,7 +145,14 @@ class DoorbellSystem:
         client.subscribe(topics)
         
     def handle_event_message(self, topic, payload):
-        """Handle doorbell or motion event messages"""
+        """Process doorbell and motion detection events from MQTT messages.
+        
+        Args:
+            topic (str): MQTT topic of the message
+            payload (dict): Message payload containing 'active', 'timestamp', and 'video_url'
+        
+        Raises:
+            ValueError: If payload is invalid or missing required fields"""
         try:
             if not isinstance(payload, dict):
                 raise ValueError("Payload must be a JSON object")
@@ -170,6 +197,12 @@ class DoorbellSystem:
             self.logger.debug(f"Problematic payload: {payload}")
             
     def on_message(self, client, userdata, msg):
+        """MQTT message callback. Routes messages to appropriate handlers based on topic.
+        
+        Args:
+            client: MQTT client instance
+            userdata: Private user data
+            msg: Received message containing topic and payload"""
         topic = msg.topic
         try:
             payload = json.loads(msg.payload.decode())
@@ -185,12 +218,18 @@ class DoorbellSystem:
             self.logger.debug(f"Raw payload: {msg.payload}")
             
     def handle_message(self, payload):
+        """Process generic message events and display them on the OLED screen.
+        
+        Args:
+            payload (Union[dict, str]): Message payload, either a dict with 'text' key or a string"""
         if isinstance(payload, dict) and 'text' in payload:
             self.oled.set_message(payload['text'])
         else:
             self.oled.set_message(str(payload))
             
     def run(self):
+        """Main system loop. Connects to MQTT broker, starts Shairport monitoring,
+        and continuously updates the OLED display."""
         # Connect to MQTT broker
         mqtt_username = self.config['mqtt']['username']
         mqtt_password = self.config['mqtt']['password']
@@ -215,6 +254,8 @@ class DoorbellSystem:
             self.cleanup()
             
     def cleanup(self):
+        """Clean up system resources on shutdown.
+        Stops MQTT client, encoders, HDMI, audio, Shairport, and OLED managers."""
         self.mqtt_client.loop_stop()
         self.mqtt_client.disconnect()
         self.encoders.cleanup()
